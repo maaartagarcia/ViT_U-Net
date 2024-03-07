@@ -4,16 +4,32 @@ from keras import layers
 import matplotlib.pyplot as plt
 import pdb
 
-input_img = keras.Input(shape=(28, 28, 1))
+input_shape = (256, 256, 3)
+nbFilter = 32 # Filter size  
+kernel = (3, 3)
+max_kernel = (2, 2) # Max Pooling Kernel Size  
 
+# input_img = keras.Input(shape=(28, 28, 1))
+input_img = keras.Input(shape=input_shape)
+
+'''
 x = layers.Conv2D(16, (3, 3), activation='relu', padding='same')(input_img)
 x = layers.MaxPooling2D((2, 2), padding='same')(x)
 x = layers.Conv2D(8, (3, 3), activation='relu', padding='same')(x)
 x = layers.MaxPooling2D((2, 2), padding='same')(x)
 x = layers.Conv2D(8, (3, 3), activation='relu', padding='same')(x)
 encoded = layers.MaxPooling2D((2, 2), padding='same')(x)
+'''
+
+x = layers.Conv2D(16, kernel, activation='relu', padding='same')(input_img)
+x = layers.MaxPooling2D(max_kernel, padding='same')(x)
+x = layers.Conv2D(8, kernel, activation='relu', padding='same')(x)
+x = layers.MaxPooling2D(max_kernel, padding='same')(x)
+x = layers.Conv2D(8, kernel, activation='relu', padding='same')(x)
+encoded = layers.MaxPooling2D(max_kernel, padding='same')(x)
 
 # at this point the representation is (4, 4, 8) i.e. 128-dimensional
+# Final representation (16, 16, ?)
 
 x = layers.Conv2D(8, (3, 3), activation='relu', padding='same')(encoded)
 x = layers.UpSampling2D((2, 2))(x)
