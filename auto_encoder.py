@@ -77,13 +77,13 @@ x = layers.MaxPooling2D(pool_size = pool_kernel, padding='same')(x)
 # Final representation (16, 16, 256)
 # ------------------------------------------------------------------------------------------------------------------------------
 
-# CONCATENATE ENCODER + ViT
+# CONCATENATE ENCODER + ViT --> Input (16, 16, 32) + (16, 16, 32) // Output (16, 16, 64)
 # ------------------------------------------------------------------------------------------------------------------------------
 
+# ENCODER
 # Layer from Encoder goes from (16, 16, 256) to (16, 16, 32)
 # ViT layer's output should also have (16, 16, 32) shape
 
-pdb.set_trace()
 x = layers.Conv2D(filters = nbFilter, kernel_size = down_kernel, activation = None,  padding = 'same')(x)
 x = layers.BatchNormalization()(x)
 x = layers.ReLU()(x)
@@ -92,6 +92,13 @@ x = layers.ReLU()(x)
 # (Before) top = tf.nn.relu(top)
 # (Before)concatenate both lstm features and image features
 # (Before) joint_out=tf.concat([top,lstm_out],3)
+
+# ViT
+# ...
+
+
+# CONCATENATE
+x = layers.concatenate([x,x], axis = 3)
 
 # ------------------------------------------------------------------------------------------------------------------------------
 
