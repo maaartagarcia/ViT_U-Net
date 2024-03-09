@@ -34,32 +34,52 @@ x = layers.Conv2D(8, (3, 3), activation='relu', padding='same')(x)
 encoded = layers.MaxPooling2D((2, 2), padding='same')(x)
 '''
 
+# ENCODER
+# ------------------------------------------------------------------------------------------------------------------------------
+
 # layer 1 -> Input (256, 256, 3) // Output (128, 128, 32)
 # (Before) layer1 = slim.conv2d( input_layer, nbFilter,[3,3], normalizer_fn = slim.batch_norm, scope = 'conv_' + str( 0 )  )
 # (Before) layer1 = slim.conv2d( input_layer, nbFilter,[3,3], normalizer_fn = slim.batch_norm, scope = 'conv_' + str( 0 )  )
 # (Original) x = layers.Conv2D(16, kernel, activation='relu', padding='same')(input_img)
 x = layers.Conv2D(filters = nbFilter, kernel_size = kernel, activation = None,  padding = 'same')(input_img)
-x = resUnit(x, 1, nbFilter)
 x = layers.BatchNormalization()(x)
+x = resUnit(x, 1, nbFilter)
 x = layers.ReLU()(x)
 x = layers.MaxPooling2D(pool_size = pool_kernel, padding='same')(x)
+
+# layer 2 -> Input (128, 128, 32) // Output (64, 64, 64)
+x = layers.Conv2D(filters = 2 * nbFilter, kernel_size = kernel, activation = None,  padding = 'same')(x)
+x = layers.BatchNormalization()(x)
+x = resUnit(x, 2, 2 * nbFilter)
+x = layers.ReLU()(x)
+x = layers.MaxPooling2D(pool_size = pool_kernel, padding='same')(x)
+
+# (Original) x = layers.Conv2D(4*nbFilter, kernel, activation='relu', padding='same')(x)
+# (Original) encoded = layers.MaxPooling2D(pool_kernel, padding='same')(x)
+
+# layer 3 -> Input (64, 64, 64) // Output (32, 32, 128)
+x = layers.Conv2D(filters = 4 * nbFilter, kernel_size = kernel, activation = None,  padding = 'same')(x)
+x = layers.BatchNormalization()(x)
+x = resUnit(x, 3, 4 * nbFilter)
+x = layers.ReLU()(x)
+x = layers.MaxPooling2D(pool_size = pool_kernel, padding='same')(x)
+
+# (Original) at this point the representation is (4, 4, 8) i.e. 128-dimensional
 
 pdb.set_trace()
 
-# layer 2 -> Input (128, 128, 32) // Output (64, 64, 64)
-# (Original) x = layers.Conv2D(8, kernel, activation='relu', padding='same')(x)
-x = layers.Conv2D(filters = 2 * nbFilter, kernel_size = kernel, activation = None,  padding = 'same')(x)
-x = resUnit(x, 2, 2 * nbFilter)
+# layer 4 -> Input (32, 32, 128) // Output(16, 16, 256)
+x = layers.Conv2D(filters = 8 * nbFilter, kernel_size = kernel, activation = None,  padding = 'same')(x)
 x = layers.BatchNormalization()(x)
+x = resUnit(x, 4, 8 * nbFilter)
 x = layers.ReLU()(x)
 x = layers.MaxPooling2D(pool_size = pool_kernel, padding='same')(x)
 
+# Final representation (16, 16, 256)
+# ------------------------------------------------------------------------------------------------------------------------------
 
-x = layers.Conv2D(4*nbFilter, kernel, activation='relu', padding='same')(x)
-encoded = layers.MaxPooling2D(pool_kernel, padding='same')(x)
-
-# at this point the representation is (4, 4, 8) i.e. 128-dimensional
-# Final representation (16, 16, ?)
+# DECODER
+# ------------------------------------------------------------------------------------------------------------------------------
 
 x = layers.Conv2D(8, (3, 3), activation='relu', padding='same')(encoded)
 x = layers.UpSampling2D((2, 2))(x)
@@ -68,6 +88,7 @@ x = layers.UpSampling2D((2, 2))(x)
 x = layers.Conv2D(16, (3, 3), activation='relu')(x)
 x = layers.UpSampling2D((2, 2))(x)
 decoded = layers.Conv2D(1, (3, 3), activation='sigmoid', padding='same')(x)
+# ------------------------------------------------------------------------------------------------------------------------------
 
 # This model maps an input to its reconstruction
 autoencoder = keras.Model(input_img, decoded)
