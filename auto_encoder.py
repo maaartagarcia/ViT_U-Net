@@ -19,7 +19,8 @@ num_imgs = 1000
 input_shape = (num_imgs, 256, 256, 3)
 nbFilter = 32 # Filter size  
 kernel = (3, 3)
-pool_kernel = (2, 2) # Max Pooling Kernel Size  
+pool_kernel = (2, 2) # Max Pooling Kernel Size
+down_kernel = (1,1) # Down sample Kernel to convert Encoder and ViT's output to (16, 16, 32) before Decoder
 
 # input_img = keras.Input(shape=(28, 28, 1))
 input_img = keras.Input(shape=input_shape[1:] )
@@ -66,8 +67,6 @@ x = layers.MaxPooling2D(pool_size = pool_kernel, padding='same')(x)
 
 # (Original) at this point the representation is (4, 4, 8) i.e. 128-dimensional
 
-pdb.set_trace()
-
 # layer 4 -> Input (32, 32, 128) // Output(16, 16, 256)
 x = layers.Conv2D(filters = 8 * nbFilter, kernel_size = kernel, activation = None,  padding = 'same')(x)
 x = layers.BatchNormalization()(x)
@@ -76,6 +75,24 @@ x = layers.ReLU()(x)
 x = layers.MaxPooling2D(pool_size = pool_kernel, padding='same')(x)
 
 # Final representation (16, 16, 256)
+# ------------------------------------------------------------------------------------------------------------------------------
+
+# CONCATENATE ENCODER + ViT
+# ------------------------------------------------------------------------------------------------------------------------------
+
+# Layer from Encoder goes from (16, 16, 256) to (16, 16, 32)
+# ViT layer's output should also have (16, 16, 32) shape
+
+pdb.set_trace()
+x = layers.Conv2D(filters = nbFilter, kernel_size = down_kernel, activation = None,  padding = 'same')(x)
+x = layers.BatchNormalization()(x)
+x = layers.ReLU()(x)
+
+# (Before) top = slim.conv2d(layer4,nbFilter,[1,1], normalizer_fn=slim.batch_norm, activation_fn=None, scope='conv_top')
+# (Before) top = tf.nn.relu(top)
+# (Before)concatenate both lstm features and image features
+# (Before) joint_out=tf.concat([top,lstm_out],3)
+
 # ------------------------------------------------------------------------------------------------------------------------------
 
 # DECODER
@@ -88,6 +105,7 @@ x = layers.UpSampling2D((2, 2))(x)
 x = layers.Conv2D(16, (3, 3), activation='relu')(x)
 x = layers.UpSampling2D((2, 2))(x)
 decoded = layers.Conv2D(1, (3, 3), activation='sigmoid', padding='same')(x)
+
 # ------------------------------------------------------------------------------------------------------------------------------
 
 # This model maps an input to its reconstruction
