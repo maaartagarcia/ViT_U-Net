@@ -20,7 +20,12 @@ input_shape = (num_imgs, 256, 256, 3)
 nbFilter = 32 # Filter size  
 kernel = (3, 3)
 pool_kernel = (2, 2) # Max Pooling Kernel Size
-down_kernel = (1,1) # Down sample Kernel to convert Encoder and ViT's output to (16, 16, 32) before Decoder
+# Down sample Kernel to convert Encoder and ViT's output to (16, 16, 32) before Decoder
+# Down sample Kernel to convert Decoder to two class maps
+down_kernel = (1,1) 
+batch_size = outSize = 16
+upsampling_factor = (4, 4)
+num_classes = 2
 
 # input_img = keras.Input(shape=(28, 28, 1))
 input_img = keras.Input(shape=input_shape[1:] )
@@ -96,22 +101,44 @@ x = layers.ReLU()(x)
 # ViT
 # ...
 
-
 # CONCATENATE
 x = layers.concatenate([x,x], axis = 3)
 
 # ------------------------------------------------------------------------------------------------------------------------------
 
-# DECODER
+# DECODER --> Input (16, 16, 64) // Output (256, 256, 2)
 # ------------------------------------------------------------------------------------------------------------------------------
 
+# Upsampling to change spatial resolution
+# Convolution to change maps' depth
+
+'''
 x = layers.Conv2D(8, (3, 3), activation='relu', padding='same')(encoded)
-x = layers.UpSampling2D((2, 2))(x)
+x = layers.UpSampling2D((2,2))(x)
 x = layers.Conv2D(8, (3, 3), activation='relu', padding='same')(x)
 x = layers.UpSampling2D((2, 2))(x)
 x = layers.Conv2D(16, (3, 3), activation='relu')(x)
 x = layers.UpSampling2D((2, 2))(x)
 decoded = layers.Conv2D(1, (3, 3), activation='sigmoid', padding='same')(x)
+'''
+pdb.set_trace()
+
+# The model uses UpSampling2D layer instead of Conv2DTranspose because the Decoder doesn't learn parameters in order to upsample the feature maps
+
+# Upsampling to batch size (16, 64, 64, 64)
+x = layers.UpSampling2D(size = upsampling_factor, interpolation = 'bilinear')(x)
+# (16, 64, 64, 2)
+# Conv2D kernel size modified from (1,1) to (3,3)
+x = layers.Conv2D(filters = num_classes, kernel_size = kernel, activation = None, padding='same')(x)
+x = layers.BatchNormalization()(x)
+x = layers.ReLU()(x)
+
+# Upsampling to batch size (16, 256, 256, 2)
+x = layers.UpSampling2D(size = upsampling_factor, interpolation = 'bilinear')(x)
+# Added
+x = layers.Conv2D(filters = num_classes, kernel_size = kernel, activation = None, padding='same')(x)
+x = layers.BatchNormalization()(x)
+x = layers.ReLU()(x)
 
 # ------------------------------------------------------------------------------------------------------------------------------
 
