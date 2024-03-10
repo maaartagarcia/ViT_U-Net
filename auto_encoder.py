@@ -247,6 +247,8 @@ for i in range(n):
     cv2.imwrite('original_' + str(i) + '.jpg', x_test[i] * 255) 
     cv2.imwrite('predicted_' + str(i) + '.jpg', decoded_imgs[i] * 255) 
 
+   # New version 
+
 # plt.show()
 
 # ------------------------------------------------------------------------------------------------------------------------------
