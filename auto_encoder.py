@@ -18,8 +18,8 @@ def resUnit(input_layer, i, nbF):
 
     return layers.add([input_layer, x])
 
-num_imgs = 1000
-input_shape = (num_imgs, 32, 32, 3)
+num_imgs = 600
+input_shape = (num_imgs, 256, 256, 3)
 nbFilter = 32 # Filter size  
 kernel = (3, 3)
 pool_kernel = (2, 2) # Max Pooling Kernel Size
@@ -140,7 +140,7 @@ x = layers.ReLU()(x)
 # Upsampling to batch size (16, 256, 256, 2)
 x = layers.UpSampling2D(size = upsampling_factor, interpolation = 'bilinear')(x)
 # Added
-x = layers.Conv2D(filters = num_classes + 1, kernel_size = kernel, activation = None, padding='same')(x)
+x = layers.Conv2D(filters = num_classes, kernel_size = kernel, activation = None, padding='same')(x)
 x = layers.BatchNormalization()(x)
 decoded = layers.ReLU()(x)
 
@@ -167,11 +167,29 @@ autoencoder.compile(optimizer='adam', loss='binary_crossentropy', metrics = ['ac
 # ------------------------------------------------------------------------------------------------------------------------------
 
 # from keras.datasets import mnist
-from keras.datasets import cifar10
+# from keras.datasets import cifar10
 import numpy as np
 
+# Added
+import h5py
+import os
+
 # (x_train, _), (x_test, _) = mnist.load_data()
-(x_train, _), (x_test, _) = cifar10.load_data()
+# (x_train, _), (x_test, _) = cifar10.load_data()
+
+imgs_file = '../training_01.hdf5'
+
+if not os.path.exists(imgs_file):
+    print("Fail. ", imgs_file, " doesn't exist.")
+    exit()
+
+f = h5py.File(imgs_file, 'r')
+
+X = f["train_img"]
+Y = f["train_labels"]  
+
+x_train, y_train = X[:500], Y[:500]
+x_test, y_test = X[500:], Y[500:]    
 
 x_train = x_train.astype('float32') / 255.
 x_test  = x_test.astype('float32')  / 255.
@@ -181,19 +199,21 @@ x_test  = x_test.astype('float32')  / 255.
 x_train = np.reshape(x_train, (len(x_train), input_shape[1] , input_shape[2], input_shape[3]))
 x_test =  np.reshape(x_test,  (len(x_test), input_shape[1] , input_shape[2], input_shape[3]))
 
-print(x_train.shape)
-print(x_test.shape)
+print("Shape Train Img: ", x_train.shape)
+print("Shape Train masks: ", y_train.shape)
+print("Shape Test Imgs: ", x_test.shape)
+print("Shape Test Masks: ", y_test.shape)
 
 # ------------------------------------------------------------------------------------------------------------------------------
 
 # TRAINING
 # ------------------------------------------------------------------------------------------------------------------------------
 
-history = autoencoder.fit(x_train, x_train,
+history = autoencoder.fit(x_train, y_train,
                           epochs=epochs,
                           batch_size=batch_size,
                           shuffle=True,
-                          validation_data=(x_test, x_test))
+                          validation_data=(x_test, y_test))
 
 # ------------------------------------------------------------------------------------------------------------------------------
 
