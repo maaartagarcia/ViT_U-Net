@@ -6,6 +6,12 @@ import matplotlib.pyplot as plt
 # Added
 import pdb
 import cv2
+import tensorflow as tf
+import numpy as np
+
+# Added
+import h5py
+import os
 
 def resUnit(input_layer, i, nbF):
     # Input Layer, number of layer, number of filters to be applied
@@ -17,6 +23,16 @@ def resUnit(input_layer, i, nbF):
     x = layers.Conv2D(filters = nbF, kernel_size = kernel, activation = None, padding = 'same')(x)
 
     return layers.add([input_layer, x])
+
+def conv_mask_gt(z):
+   # Given a mask, returns two class tensor for every pixel
+    z = tf.convert_to_tensor(z)
+
+    background = tf.cast(( z == 0), dtype = 'float32')
+    manipulated = tf.cast(( z == 1), dtype = 'float32')
+
+
+    return [background, manipulated] 
 
 num_imgs = 600
 input_shape = (num_imgs, 256, 256, 3)
@@ -30,7 +46,7 @@ batch_size = 128
 outSize = 16
 upsampling_factor = (4, 4)
 num_classes = 2
-epochs = 400
+epochs = 5
 
 # input_img = keras.Input(shape=(28, 28, 1))
 input_img = keras.Input(shape=input_shape[1:] )
@@ -168,11 +184,6 @@ autoencoder.compile(optimizer='adam', loss='binary_crossentropy', metrics = ['ac
 
 # from keras.datasets import mnist
 # from keras.datasets import cifar10
-import numpy as np
-
-# Added
-import h5py
-import os
 
 # (x_train, _), (x_test, _) = mnist.load_data()
 # (x_train, _), (x_test, _) = cifar10.load_data()
@@ -195,9 +206,23 @@ x_train = x_train.astype('float32') / 255.
 x_test  = x_test.astype('float32')  / 255.
 # x_train = np.reshape(x_train, (len(x_train), 28, 28, 1)) 
 # x_test =  np.reshape(x_test,  (len(x_test),  28, 28, 1))
+# x_train = np.reshape(x_train, (len(x_train), input_shape[1] , input_shape[2], input_shape[3]))
+# x_test =  np.reshape(x_test,  (len(x_test), input_shape[1] , input_shape[2], input_shape[3]))
 
-x_train = np.reshape(x_train, (len(x_train), input_shape[1] , input_shape[2], input_shape[3]))
-x_test =  np.reshape(x_test,  (len(x_test), input_shape[1] , input_shape[2], input_shape[3]))
+y_train_aux = []
+y_test_aux = []  
+
+for m in y_train:
+    y_train_aux.append(conv_mask_gt(m))
+
+for m in y_test:
+    y_test_aux.append(conv_mask_gt(m))
+
+y_train_conv = np.array(y_train_aux)
+y_test_conv = np.array(y_test_aux)
+
+y_train = np.transpose(y_train_aux, (0, 2, 3, 1))
+y_test = np.transpose(y_test_aux, (0, 2, 3, 1))
 
 print("Shape Train Img: ", x_train.shape)
 print("Shape Train masks: ", y_train.shape)
