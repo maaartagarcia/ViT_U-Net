@@ -1,3 +1,4 @@
 cifar10*
 *.jpg
 *.png
+/hdf5

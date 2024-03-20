@@ -46,7 +46,7 @@ batch_size = 128
 outSize = 16
 upsampling_factor = (4, 4)
 num_classes = 2
-epochs = 5
+epochs = 20
 
 # input_img = keras.Input(shape=(28, 28, 1))
 input_img = keras.Input(shape=input_shape[1:] )
@@ -156,7 +156,7 @@ x = layers.ReLU()(x)
 # Upsampling to batch size (16, 256, 256, 2)
 x = layers.UpSampling2D(size = upsampling_factor, interpolation = 'bilinear')(x)
 # Added
-x = layers.Conv2D(filters = num_classes, kernel_size = kernel, activation = None, padding='same')(x)
+x = layers.Conv2D(filters = num_classes, kernel_size = kernel, activation = 'softmax', padding='same')(x)
 x = layers.BatchNormalization()(x)
 decoded = layers.ReLU()(x)
 
@@ -188,7 +188,7 @@ autoencoder.compile(optimizer='adam', loss='binary_crossentropy', metrics = ['ac
 # (x_train, _), (x_test, _) = mnist.load_data()
 # (x_train, _), (x_test, _) = cifar10.load_data()
 
-imgs_file = '../training_01.hdf5'
+imgs_file = './training_01.hdf5'
 
 if not os.path.exists(imgs_file):
     print("Fail. ", imgs_file, " doesn't exist.")
@@ -199,8 +199,11 @@ f = h5py.File(imgs_file, 'r')
 X = f["train_img"]
 Y = f["train_labels"]  
 
-x_train, y_train = X[:500], Y[:500]
-x_test, y_test = X[500:], Y[500:]    
+x_train, y_train = X[:20], Y[:20]
+x_test, y_test = X[20:], Y[20:]    
+
+xo_train, yo_train = x_train, y_train
+xo_test, yo_test  = x_test, y_test 
 
 x_train = x_train.astype('float32') / 255.
 x_test  = x_test.astype('float32')  / 255.
@@ -290,7 +293,13 @@ for i in range(n):
     '''
     # Added
     cv2.imwrite('original_' + str(i) + '.jpg', x_test[i] * 255) 
-    cv2.imwrite('predicted_' + str(i) + '.jpg', decoded_imgs[i] * 255) 
+
+    argmax = np.argmax(decoded_imgs[i], axis = -1)
+    b_pred = (argmax == 1)
+    cv2.imwrite('predicted_' + str(i) + '.png', b_pred * 255) 
+
+
+autoencoder.save('./model/trained_model.keras', overwrite = False)
 
 # plt.show()
 
