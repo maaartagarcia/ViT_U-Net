@@ -46,7 +46,7 @@ batch_size = 128
 outSize = 16
 upsampling_factor = (4, 4)
 num_classes = 2
-epochs = 20
+epochs = 100
 
 # input_img = keras.Input(shape=(28, 28, 1))
 input_img = keras.Input(shape=input_shape[1:] )
@@ -199,8 +199,8 @@ f = h5py.File(imgs_file, 'r')
 X = f["train_img"]
 Y = f["train_labels"]  
 
-x_train, y_train = X[:20], Y[:20]
-x_test, y_test = X[20:], Y[20:]    
+x_train, y_train = X[:946], Y[:946]
+x_test, y_test = X[946:], Y[946:]    
 
 xo_train, yo_train = x_train, y_train
 xo_test, yo_test  = x_test, y_test 
@@ -269,8 +269,15 @@ decoded_imgs = autoencoder.predict(x_test)
 # EXAMPLES RESULT
 # ------------------------------------------------------------------------------------------------------------------------------
 
-n = 10  # How many digits we will display
+result_file = './validation_results.hdf5'
+f = h5py.File(result_file, 'w')
+
+n = 20  # How many digits we will display
 # plt.figure(figsize=(20, 4))
+
+images = []
+predictions = []
+masks = []
 
 for i in range(n):
     '''
@@ -292,12 +299,19 @@ for i in range(n):
 
     '''
     # Added
-    cv2.imwrite('original_' + str(i) + '.jpg', x_test[i] * 255) 
-
     argmax = np.argmax(decoded_imgs[i], axis = -1)
     b_pred = (argmax == 1)
-    cv2.imwrite('predicted_' + str(i) + '.png', b_pred * 255) 
 
+    # cv2.imwrite('original_' + str(i) + '.jpg', x_test[i] * 255) 
+    images.append(x_test[i] * 255)
+    masks.append(yo_test[i] * 255)
+    predictions.append(b_pred * 255)
+
+    # cv2.imwrite('predicted_' + str(i) + '.png', b_pred * 255) 
+
+f.create_dataset("validation_img", shape = (n, 256, 256, 3), data = images)
+f.create_dataset("validation_labels", shape = (n, 256, 256), data = masks)
+f.create_dataset("validation_pred", shape = (n, 256, 256), data = predictions)
 
 autoencoder.save('./model/trained_model.keras', overwrite = False)
 
