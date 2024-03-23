@@ -1,3 +1,5 @@
-cifar10*
-*.jpg
-*.png
+output/
+hdf5/
+model/
+results/
+tests/

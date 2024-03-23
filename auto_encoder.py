@@ -8,10 +8,12 @@ import pdb
 import cv2
 import tensorflow as tf
 import numpy as np
+import math
 
 # Added
 import h5py
 import os
+from utils import transform_masks, transform_predictions
 
 def resUnit(input_layer, i, nbF):
     # Input Layer, number of layer, number of filters to be applied
@@ -24,18 +26,6 @@ def resUnit(input_layer, i, nbF):
 
     return layers.add([input_layer, x])
 
-def conv_mask_gt(z):
-   # Given a mask, returns two class tensor for every pixel
-    z = tf.convert_to_tensor(z)
-
-    background = tf.cast(( z == 0), dtype = 'float32')
-    manipulated = tf.cast(( z == 1), dtype = 'float32')
-
-
-    return [background, manipulated] 
-
-num_imgs = 600
-input_shape = (num_imgs, 256, 256, 3)
 nbFilter = 32 # Filter size  
 kernel = (3, 3)
 pool_kernel = (2, 2) # Max Pooling Kernel Size
@@ -46,7 +36,97 @@ batch_size = 128
 outSize = 16
 upsampling_factor = (4, 4)
 num_classes = 2
-epochs = 5
+epochs = 500
+num_imgs = None # Assigned when reading the data file 
+input_shape = None
+pt = 0.95 # Proportion of images used for training ( 1 - pt will be validation images)  
+# Input shape: width, height, channels
+w = 256
+h = 256
+c = 3
+
+# DATA PREPARATION
+# ------------------------------------------------------------------------------------------------------------------------------
+
+# from keras.datasets import mnist
+# from keras.datasets import cifar10
+
+# (x_train, _), (x_test, _) = mnist.load_data()
+# (x_train, _), (x_test, _) = cifar10.load_data()
+
+# imgs_file = '/scratch.local2/al404273/m08/data/vit_data.hdf5'
+# imgs_file = './hdf5/training_01.hdf5'
+imgs_file = './hdf5/training_01.hdf5'
+images_label = "train_img"
+masks_label = "train_labels"
+
+if not os.path.exists(imgs_file):
+    print("Fail. ", imgs_file, " doesn't exist.")
+    exit()
+
+f = h5py.File(imgs_file, 'r')
+
+if images_label not in f or masks_label not in f:
+    print("Fail. ", imgs_file, " doesn't contain ", images_label, " and ", masks_label, " datasets.")
+    exit()
+
+X = f[images_label]
+Y = f[masks_label]  
+
+num_imgs = X.shape[0]
+num_masks = Y.shape[0]  
+
+if num_imgs != num_masks:
+    print("Fail. Not the same amount of images an masks in hdf5 file.")
+    exit()
+
+train_p = int(math.floor(num_imgs * pt)) #  Train proportion 
+test_p = int(math.floor(num_imgs * (1 - pt))) #  Validation proportion 
+
+print("Total images: ", num_imgs)
+print("Training images: ", train_p)
+print("Testing images: ", test_p)
+
+if train_p + test_p > num_imgs:
+    print("Fail. Invalid training and validation proportions. Those values should match.")
+    exit()
+
+x_train, y_train = X[:train_p], Y[:train_p]
+x_test, y_test = X[train_p:], Y[train_p:]    
+
+xo_train, yo_train = x_train, y_train
+xo_test, yo_test  = x_test, y_test 
+
+# Normalized images only
+x_train = x_train.astype('float32') / 255.
+x_test  = x_test.astype('float32')  / 255.
+# x_train = np.reshape(x_train, (len(x_train), 28, 28, 1)) 
+# x_test =  np.reshape(x_test,  (len(x_test),  28, 28, 1))
+# x_train = np.reshape(x_train, (len(x_train), input_shape[1] , input_shape[2], input_shape[3]))
+# x_test =  np.reshape(x_test,  (len(x_test), input_shape[1] , input_shape[2], input_shape[3])
+
+y_train_conv = np.zeros((train_p, 256, 256, 2))
+y_test_conv = np.zeros((test_p, 256, 256, 2))
+
+for i in range(train_p):
+    y_train_conv[i] = transform_masks(y_train[i]) 
+    
+for i in range(test_p):
+    y_test_conv[i] = transform_masks(y_test[i])
+
+y_train = y_train_conv
+y_test = y_test_conv
+
+print("Shape Train Img: ", x_train.shape)
+print("Shape Train masks: ", y_train.shape)
+print("Shape Test Imgs: ", x_test.shape)
+print("Shape Test Masks: ", y_test.shape)
+
+input_shape = (num_imgs, w, h, c)
+
+print("--> Model's input shape: ", input_shape)
+
+# ------------------------------------------------------------------------------------------------------------------------------
 
 # input_img = keras.Input(shape=(28, 28, 1))
 input_img = keras.Input(shape=input_shape[1:] )
@@ -123,7 +203,7 @@ x = layers.ReLU()(x)
 # ...
 
 # CONCATENATE
-x = layers.concatenate([x,x], axis = 3)
+# x = layers.concatenate([x,x], axis = 3)
 
 # ------------------------------------------------------------------------------------------------------------------------------
 
@@ -156,9 +236,9 @@ x = layers.ReLU()(x)
 # Upsampling to batch size (16, 256, 256, 2)
 x = layers.UpSampling2D(size = upsampling_factor, interpolation = 'bilinear')(x)
 # Added
-x = layers.Conv2D(filters = num_classes, kernel_size = kernel, activation = None, padding='same')(x)
-x = layers.BatchNormalization()(x)
-decoded = layers.ReLU()(x)
+x = layers.Conv2D(filters = num_classes, kernel_size = kernel, activation = 'softmax', padding='same')(x)
+# x = layers.BatchNormalization()(x)
+# x = layers.ReLU()(x)
 
 # ------------------------------------------------------------------------------------------------------------------------------
 
@@ -166,7 +246,7 @@ decoded = layers.ReLU()(x)
 # ------------------------------------------------------------------------------------------------------------------------------
 
 # This model maps an input to its reconstruction
-autoencoder = keras.Model(input_img, decoded)
+autoencoder = keras.Model(input_img, x)
 
 # This is the size of our encoded representations
 # encoding_dim = 128  # latent representation is (4, 4, 8) i.e. 128-dimensional
@@ -178,59 +258,6 @@ autoencoder.compile(optimizer='adam', loss='binary_crossentropy', metrics = ['ac
 # autoencoder.compile(optimizer='adam', loss='mean_squared_error')
 
 # ------------------------------------------------------------------------------------------------------------------------------
-
-# DATA PREPARATION
-# ------------------------------------------------------------------------------------------------------------------------------
-
-# from keras.datasets import mnist
-# from keras.datasets import cifar10
-
-# (x_train, _), (x_test, _) = mnist.load_data()
-# (x_train, _), (x_test, _) = cifar10.load_data()
-
-imgs_file = '../training_01.hdf5'
-
-if not os.path.exists(imgs_file):
-    print("Fail. ", imgs_file, " doesn't exist.")
-    exit()
-
-f = h5py.File(imgs_file, 'r')
-
-X = f["train_img"]
-Y = f["train_labels"]  
-
-x_train, y_train = X[:500], Y[:500]
-x_test, y_test = X[500:], Y[500:]    
-
-x_train = x_train.astype('float32') / 255.
-x_test  = x_test.astype('float32')  / 255.
-# x_train = np.reshape(x_train, (len(x_train), 28, 28, 1)) 
-# x_test =  np.reshape(x_test,  (len(x_test),  28, 28, 1))
-# x_train = np.reshape(x_train, (len(x_train), input_shape[1] , input_shape[2], input_shape[3]))
-# x_test =  np.reshape(x_test,  (len(x_test), input_shape[1] , input_shape[2], input_shape[3]))
-
-y_train_aux = []
-y_test_aux = []  
-
-for m in y_train:
-    y_train_aux.append(conv_mask_gt(m))
-
-for m in y_test:
-    y_test_aux.append(conv_mask_gt(m))
-
-y_train_conv = np.array(y_train_aux)
-y_test_conv = np.array(y_test_aux)
-
-y_train = np.transpose(y_train_aux, (0, 2, 3, 1))
-y_test = np.transpose(y_test_aux, (0, 2, 3, 1))
-
-print("Shape Train Img: ", x_train.shape)
-print("Shape Train masks: ", y_train.shape)
-print("Shape Test Imgs: ", x_test.shape)
-print("Shape Test Masks: ", y_test.shape)
-
-# ------------------------------------------------------------------------------------------------------------------------------
-
 # TRAINING
 # ------------------------------------------------------------------------------------------------------------------------------
 
@@ -257,6 +284,7 @@ plt.show()
 
 # Encode and decode some digits
 # Note that we take them from the *test* set
+
 decoded_imgs = autoencoder.predict(x_test)
 
 # Show some image digits examples and their reconstruction
@@ -267,7 +295,32 @@ decoded_imgs = autoencoder.predict(x_test)
 # ------------------------------------------------------------------------------------------------------------------------------
 
 n = 10  # How many digits we will display
+
+while n > decoded_imgs.shape[0]:
+    print("Fail. Testing images cannot be greater than x_test.")
+    response = input('New number of testing images? (number/no) ')
+    if n == 'no':
+        exit()
+    n = int(response)
+
+'''
+result_file = './hdf5/validation_results.hdf5'
+print("Important. Testing of ", n, " images (Original images, masks, and model predictions) will be saved in ", result_file, " file.")
+
+if os.path.exists(result_file):
+    print("Fail. ", result_file, " already exists. ")
+    response = input("Want to delete? (s/n): ")
+    if response == "s":
+        os.remove(result_file)
+
+f = h5py.File(result_file, 'w')
+'''
+
 # plt.figure(figsize=(20, 4))
+
+# images = []
+# predictions = []
+# masks = []
 
 for i in range(n):
     '''
@@ -288,9 +341,27 @@ for i in range(n):
     ax.get_yaxis().set_visible(False)
 
     '''
+
     # Added
-    cv2.imwrite('original_' + str(i) + '.jpg', x_test[i] * 255) 
-    cv2.imwrite('predicted_' + str(i) + '.jpg', decoded_imgs[i] * 255) 
+    pdb.set_trace()
+    pred = transform_predictions(decoded_imgs[i], 0.4)
+    cv2.imwrite('./results/images/original_' + str(i) + '.jpg', x_test[i] * 255) 
+
+    '''
+    images.append(x_test[i] * 255)
+    masks.append(yo_test[i] * 255)
+    predictions.append(b_pred * 255)
+    '''
+    cv2.imwrite('./results/masks/mask_' + str(i) + '.png', yo_test[i]  * 255) 
+    cv2.imwrite('./results/predictions/predicted_' + str(i) + '.png', pred * 255) 
+
+'''
+f.create_dataset("validation_img", shape = (n, w, h, c), data = images)
+f.create_dataset("validation_labels", shape = (n, w, h), data = masks)
+f.create_dataset("validation_pred", shape = (n, w, h), data = predictions)
+'''
+
+autoencoder.save('./model/trained_model.keras', overwrite = True)
 
 # plt.show()
 
