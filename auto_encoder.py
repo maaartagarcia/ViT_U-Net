@@ -361,6 +361,7 @@ if not testing:
     plt.show()
 
 if testing:
+    pdb.set_trace()
     ni = x_test.shape[0]  
     accuracy = autoencoder.evaluate(x = x_test, y = y_test)
     preditions = autoencoder.predict(x_test)

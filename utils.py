@@ -52,4 +52,12 @@ def validate_input_images(hdf5_file, images_label, masks_label):
 
     return True
 
-
+def dice_loss(y_pred, y_true):
+    smooth = 1e-5
+    y_true_f = y_true.flatten()
+    y_pred_f = y_pred.flatten()
+    
+    intersection = np.sum(y_true_f * y_pred_f)
+    dice_coeff = (2. * intersection + smooth) / (np.sum(y_true_f) + np.sum(y_pred_f) + smooth)
+    
+    return 1.0 - dice_coeff
