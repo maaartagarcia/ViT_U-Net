@@ -1,4 +1,4 @@
-from utils import conv_mask_gt, transform_masks, transform_predictions
+from utils import conv_mask_gt, transform_masks, transform_predictions, validate_input_images
 import numpy as np
 import pdb, os
 
